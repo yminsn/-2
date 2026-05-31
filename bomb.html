@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>숭실대 부시기 시뮬레이터 💣</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            overflow: hidden;
+            cursor: crosshair;
+            background: #000;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transition: background-image 0.3s ease;
+        }
+
+        #crack-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .bomb {
+            position: absolute;
+            font-size: 40px;
+            animation: pulse 0.3s infinite;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            filter: drop-shadow(0 0 10px rgba(255, 100, 0, 0.8));
+            z-index: 10;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.2); }
+        }
+
+        .explosion {
+            position: absolute;
+            pointer-events: none;
+            animation: explode 0.6s ease-out forwards;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+        }
+
+        @keyframes explode {
+            0% { 
+                opacity: 1; 
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            50% { 
+                opacity: 1; 
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+            100% { 
+                opacity: 0; 
+                transform: translate(-50%, -50%) scale(2);
+            }
+        }
+
+        /* 💥 금 이미지 크기를 150px -> 80px로 자연스럽게 축소! */
+        .crack-overlay {
+            position: absolute;
+            pointer-events: none;
+            animation: crackAppear 0.3s ease-out;
+            transform: translate(-50%, -50%);
+            width: 80px; 
+            height: 80px;
+            z-index: 15;
+        }
+
+        @keyframes crackAppear {
+            from { 
+                opacity: 0; 
+                transform: translate(-50%, -50%) scale(0);
+            }
+            to { 
+                opacity: 1; 
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        #ui {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 30px;
+            border-radius: 15px;
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #ui div {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        #ui button {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        #ui button:hover {
+            background: #ff0000;
+            transform: scale(1.05);
+        }
+
+        #ui button:active {
+            transform: scale(0.95);
+        }
+
+        #building-selector {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
+        }
+
+        #building-selector button {
+            width: 100px;
+            height: 70px;
+            background-size: cover;
+            background-position: center;
+            border: 3px solid white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        #building-selector button:hover {
+            transform: scale(1.1);
+            border-color: #ffd700;
+            box-shadow: 0 6px 20px rgba(255,215,0,0.6);
+        }
+
+        #building-selector button.active {
+            border-color: #ff4444;
+            border-width: 4px;
+        }
+
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particleFly 0.8s ease-out forwards;
+            z-index: 25;
+        }
+
+        @keyframes particleFly {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--tx), var(--ty)) scale(0);
+            }
+        }
+
+        .shake {
+            animation: shake 0.3s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            10%, 30%, 50%, 70%, 90% { transform: translate(-5px, -5px); }
+            20%, 40%, 60%, 80% { transform: translate(5px, 5px); }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="background"></div>
+        <div id="crack-layer"></div>
+    </div>
+
+    <div id="ui">
+        <div>💣 폭파: <span id="bomb-count">0</span>개</div>
+        <div>🔥 콤보: <span id="combo">0</span></div>
+        <button onclick="reset()">🔄 리셋</button>
+    </div>
+
+    <div id="building-selector"></div>
+
+    <script>
+        const buildings = [
+            './숭입.jpg',
+            './중도.jpg',
+            './야경_1.jpg',
+            './가을_2.jpg',
+            './여름_2.jpg',
+            './정보과학관.jpg'
+        ];
+
+        const buildingNames = [
+            '숭실대입구역 정문',
+            '중앙도서관',
+            '숭덕경상관 야경',
+            '형남공학관 가을',
+            '안익태기념관 여름',
+            '정보과학관'
+        ];
+
+        // 🔄 금.jpeg에서 금.png로 파일명 및 확장자 완벽 변경!
+        const crackImage = './금.png';
+
+        let currentBuilding = 0;
+        let bombCount = 0;
+        let combo = 0;
+        let comboTimer = null;
+        let audioContext = null;
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playFuseSound() {
+            initAudio();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 800;
+            oscillator.type = 'square';
+
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+
+        function playExplosionSound() {
+            initAudio();
+
+            const bass = audioContext.createOscillator();
+            const bassGain = audioContext.createGain();
+            bass.connect(bassGain);
+            bassGain.connect(audioContext.destination);
+            bass.frequency.value = 80;
+            bass.type = 'sawtooth';
+            bassGain.gain.setValueAtTime(0.5, audioContext.currentTime);
+            bassGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            bass.start(audioContext.currentTime);
+            bass.stop(audioContext.currentTime + 0.5);
+
+            const bufferSize = audioContext.sampleRate * 0.3;
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const output = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioContext.createBufferSource();
+            noise.buffer = buffer;
+            const noiseGain = audioContext.createGain();
+            noise.connect(noiseGain);
+            noiseGain.connect(audioContext.destination);
+            noiseGain.gain.setValueAtTime(0.3, audioContext.currentTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            noise.start(audioContext.currentTime);
+        }
+
+        function setBackground(index) {
+            currentBuilding = index;
+            document.getElementById('background').style.backgroundImage = `url('${buildings[index]}')`;
+
+            document.querySelectorAll('.bomb').forEach(el => el.remove());
+            document.querySelectorAll('.crack-overlay').forEach(el => el.remove());
+            document.querySelectorAll('.explosion').forEach(el => el.remove());
+            document.querySelectorAll('.particle').forEach(el => el.remove());
+
+            document.querySelectorAll('#building-selector button').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+        }
+
+        function placeBomb(x, y) {
+            playFuseSound();
+
+            const bomb = document.createElement('div');
+            bomb.className = 'bomb';
+            bomb.textContent = '💣';
+            bomb.style.left = x + 'px';
+            bomb.style.top = y + 'px';
+
+            document.getElementById('game-container').appendChild(bomb);
+
+            setTimeout(() => {
+                if (bomb.parentElement) {
+                    explode(x, y);
+                    bomb.remove();
+
+                    bombCount++;
+                    document.getElementById('bomb-count').textContent = bombCount;
+                }
+            }, 1500);
+        }
+
+        function explode(x, y) {
+            playExplosionSound();
+
+            const container = document.getElementById('game-container');
+            container.classList.add('shake');
+            setTimeout(() => container.classList.remove('shake'), 300);
+
+            const explosion = document.createElement('div');
+            explosion.className = 'explosion';
+            explosion.textContent = '💥';
+            explosion.style.left = x + 'px';
+            explosion.style.top = y + 'px';
+            explosion.style.fontSize = '100px';
+            document.getElementById('game-container').appendChild(explosion);
+            setTimeout(() => explosion.remove(), 600);
+
+            const crack = document.createElement('img');
+            crack.className = 'crack-overlay';
+            crack.src = crackImage;
+            crack.style.left = x + 'px';
+            crack.style.top = y + 'px';
+            document.getElementById('crack-layer').appendChild(crack);
+
+            for (let i = 0; i < 20; i++) {
+                createParticle(x, y);
+            }
+
+            combo++;
+            document.getElementById('combo').textContent = combo;
+            clearTimeout(comboTimer);
+            comboTimer = setTimeout(() => {
+                combo = 0;
+                document.getElementById('combo').textContent = '0';
+            }, 2000);
+        }
+
+        function createParticle(x, y) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = x + 'px';
+            particle.style.top = y + 'px';
+
+            const colors = ['#ff6b35', '#f7931e', '#fdc830', '#ff4444', '#ff8800'];
+            particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 50 + Math.random() * 100;
+            const tx = Math.cos(angle) * distance;
+            const ty = Math.sin(angle) * distance;
+
+            particle.style.setProperty('--tx', tx + 'px');
+            particle.style.setProperty('--ty', ty + 'px');
+
+            document.getElementById('game-container').appendChild(particle);
+            setTimeout(() => particle.remove(), 800);
+        }
+
+        function reset() {
+            document.querySelectorAll('.crack-overlay').forEach(el => el.remove());
+            document.querySelectorAll('.bomb').forEach(el => el.remove());
+            document.querySelectorAll('.explosion').forEach(el => el.remove());
+            document.querySelectorAll('.particle').forEach(el => el.remove());
+            bombCount = 0;
+            combo = 0;
+            document.getElementById('bomb-count').textContent = '0';
+            document.getElementById('combo').textContent = '0';
+        }
+
+        document.getElementById('game-container').addEventListener('click', (e) => {
+            if(e.target.closest('#ui') || e.target.closest('#building-selector')) return;
+            placeBomb(e.clientX, e.clientY);
+        });
+
+        const selector = document.getElementById('building-selector');
+        buildings.forEach((url, index) => {
+            const btn = document.createElement('button');
+            btn.style.backgroundImage = `url('${url}')`;
+            btn.onclick = () => setBackground(index);
+            btn.title = buildingNames[index];
+            selector.appendChild(btn);
+        });
+
+        setBackground(0);
+    </script>
+</body>
+</html>
